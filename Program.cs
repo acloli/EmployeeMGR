@@ -9,7 +9,10 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite("EmployeeList"));
+builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite(
+    builder.Configuration.GetConnectionString("EmployeeList") ??
+    throw new InvalidOperationException("EmployeeList接続設定がありません。")
+));
 
 var app = builder.Build();
 
