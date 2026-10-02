@@ -51,7 +51,16 @@ namespace EmployeeMGR.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(request).State = EntityState.Modified;
+            Employee employee = new()
+            {
+                Id = request.Id,
+                Name = request.Name,
+                Email = request.Email,
+                Phone = request.Phone,
+                Department = request.Department
+            };
+
+            _context.Entry(employee).State = EntityState.Modified;
 
             try
             {
