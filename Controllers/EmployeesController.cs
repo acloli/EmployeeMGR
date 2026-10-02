@@ -20,16 +20,28 @@ namespace EmployeeMGR.Controllers
             _context = context;
         }
 
+        private static EmployeeResponse ToEmployeeResponse(Employee employee)
+        {
+            return new EmployeeResponse
+            {
+                Id = employee.Id,
+                Name = employee.Name,
+                Email = employee.Email,
+                Phone = employee.Phone,
+                Department = employee.Department
+            };
+        }
+
         // GET: api/Employees
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Employee>>> GetEmployees()
+        public async Task<ActionResult<IEnumerable<EmployeeResponse>>> GetEmployees()
         {
-            return await _context.Employees.ToListAsync();
+            return await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
         }
 
         // GET: api/Employees/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Employee>> GetEmployee(int id)
+        public async Task<ActionResult<EmployeeResponse>> GetEmployee(int id)
         {
             var employee = await _context.Employees.FindAsync(id);
 
@@ -38,7 +50,7 @@ namespace EmployeeMGR.Controllers
                 return NotFound();
             }
 
-            return employee;
+            return ToEmployeeResponse(employee);
         }
 
         // PUT: api/Employees/5
@@ -84,7 +96,7 @@ namespace EmployeeMGR.Controllers
         // POST: api/Employees
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Employee>> PostEmployee([FromBody] CreateEmployeeRequest request)
+        public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request)
         {
             Employee employee = new Employee
             {
@@ -96,7 +108,7 @@ namespace EmployeeMGR.Controllers
             _context.Employees.Add(employee);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
+            return CreatedAtAction("GetEmployee", new { id = employee.Id }, ToEmployeeResponse(employee));
         }
 
         // DELETE: api/Employees/5
