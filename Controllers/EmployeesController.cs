@@ -44,14 +44,14 @@ namespace EmployeeMGR.Controllers
         // PUT: api/Employees/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutEmployee(int id, Employee employee)
+        public async Task<IActionResult> PutEmployee(int id, [FromBody] UpdateEmployeeRequest request)
         {
-            if (id != employee.Id)
+            if (id != request.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(employee).State = EntityState.Modified;
+            _context.Entry(request).State = EntityState.Modified;
 
             try
             {
@@ -75,8 +75,15 @@ namespace EmployeeMGR.Controllers
         // POST: api/Employees
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Employee>> PostEmployee(Employee employee)
+        public async Task<ActionResult<Employee>> PostEmployee([FromBody] CreateEmployeeRequest request)
         {
+            Employee employee = new Employee
+            {
+                Name = request.Name,
+                Email = request.Email,
+                Phone = request.Phone,
+                Department = request.Department
+            };
             _context.Employees.Add(employee);
             await _context.SaveChangesAsync();
 
