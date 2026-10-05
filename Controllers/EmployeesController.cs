@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using EmployeeMGR.Models;
+using EmployeeMGR.Services;
 
 namespace EmployeeMGR.Controllers
 {
@@ -13,44 +8,32 @@ namespace EmployeeMGR.Controllers
     [ApiController]
     public class EmployeesController : ControllerBase
     {
-        private readonly EmployeeContext _context;
+        private readonly IEmployeeService _employeeService;
 
-        public EmployeesController(EmployeeContext context)
+        public EmployeesController(IEmployeeService employeeService)
         {
-            _context = context;
-        }
-
-        private static EmployeeResponse ToEmployeeResponse(Employee employee)
-        {
-            return new EmployeeResponse
-            {
-                Id = employee.Id,
-                Name = employee.Name,
-                Email = employee.Email,
-                Phone = employee.Phone,
-                Department = employee.Department
-            };
+            _employeeService = employeeService;
         }
 
         // GET: api/Employees
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<EmployeeResponse>>> GetEmployees()
+        public async Task<IEnumerable<EmployeeResponse>> GetEmployees()
         {
-            return await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
+            return await _employeeService.GetAllEmployeesAsync();
         }
 
         // GET: api/Employees/5
         [HttpGet("{id}")]
         public async Task<ActionResult<EmployeeResponse>> GetEmployee(int id)
         {
-            var employee = await _context.Employees.FindAsync(id);
+            var employee = await _employeeService.GetEmployeeByIdAsync(id);
 
             if (employee == null)
             {
                 return NotFound();
             }
 
-            return ToEmployeeResponse(employee);
+            return employee;
         }
 
         // PUT: api/Employees/5
@@ -72,25 +55,16 @@ namespace EmployeeMGR.Controllers
                 Department = request.Department
             };
 
-            _context.Entry(employee).State = EntityState.Modified;
+            var updated = await _employeeService.UpdateEmployeeAsync(id, request);
 
-            try
+            if (!updated)
             {
-                await _context.SaveChangesAsync();
+                return NotFound();
             }
-            catch (DbUpdateConcurrencyException)
+            else
             {
-                if (!EmployeeExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NoContent();
             }
-
-            return NoContent();
         }
 
         // POST: api/Employees
@@ -98,38 +72,23 @@ namespace EmployeeMGR.Controllers
         [HttpPost]
         public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request)
         {
-            Employee employee = new Employee
-            {
-                Name = request.Name,
-                Email = request.Email,
-                Phone = request.Phone,
-                Department = request.Department
-            };
-            _context.Employees.Add(employee);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetEmployee", new { id = employee.Id }, ToEmployeeResponse(employee));
+            var created = await _employeeService.CreateEmployeeAsync(request);
+            return created;
         }
 
         // DELETE: api/Employees/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEmployee(int id)
         {
-            var employee = await _context.Employees.FindAsync(id);
-            if (employee == null)
+            var deleted = await _employeeService.DeleteEmployeeAsync(id);
+            if (!deleted)
             {
                 return NotFound();
             }
-
-            _context.Employees.Remove(employee);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool EmployeeExists(int id)
-        {
-            return _context.Employees.Any(e => e.Id == id);
+            else
+            {
+                return NoContent();
+            }
         }
     }
 }
