@@ -19,9 +19,10 @@ namespace EmployeeMGR.Controllers
         // GET: api/Employees?department=Sales
         // GET: api/Employees?name=Sales&page=1&pageSize=20
         [HttpGet]
-        public async Task<PagedResponse<EmployeeResponse>> GetEmployees([FromQuery] EmployeeSearchRequest request)
+        public async Task<PagedResponse<EmployeeResponse>> GetEmployees([FromQuery] EmployeeSearchRequest request,
+            CancellationToken token)
         {
-            return await _employeeService.GetEmployeesAsync(request);
+            return await _employeeService.GetEmployeesAsync(request, token);
         }
 
         // GET: api/Employees/all

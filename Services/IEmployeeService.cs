@@ -5,7 +5,7 @@ namespace EmployeeMGR.Services;
 public interface IEmployeeService
 {
     Task<IEnumerable<EmployeeResponse>> GetAllEmployeesAsync();
-    Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(EmployeeSearchRequest request);
+    Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(EmployeeSearchRequest request, CancellationToken token);
     Task<EmployeeResponse?> GetEmployeeByIdAsync(int id);
     Task<EmployeeResponse> CreateEmployeeAsync(CreateEmployeeRequest request);
     Task<bool> UpdateEmployeeAsync(int id, UpdateEmployeeRequest request);

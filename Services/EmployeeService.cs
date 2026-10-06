@@ -29,7 +29,8 @@ public class EmployeeService : IEmployeeService
         return await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
     }
 
-    public async Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(EmployeeSearchRequest request)
+    public async Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(EmployeeSearchRequest request,
+        CancellationToken token)
     {
         var query = _context.Employees.AsQueryable();
         if (!string.IsNullOrWhiteSpace(request.Name))
@@ -42,8 +43,8 @@ public class EmployeeService : IEmployeeService
             query = query.Where(e => e.Department!.Contains(request.Department));
         }
 
-        var employees = await query.Select(e => ToEmployeeResponse(e)).ToListAsync();
-        var totalCount = await query.CountAsync();
+        var employees = await query.Select(e => ToEmployeeResponse(e)).ToListAsync(token);
+        var totalCount = await query.CountAsync(token);
         var pageCount = (int)Math.Ceiling((double)totalCount / request.PageSize);
 
         if (request.Page < 1 || request.Page > pageCount)
