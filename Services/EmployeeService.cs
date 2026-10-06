@@ -29,39 +29,38 @@ public class EmployeeService : IEmployeeService
         return await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
     }
 
-    public async Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(string? name, string? department,
-        int page, int pageSize)
+    public async Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(EmployeeSearchRequest request)
     {
         var query = _context.Employees.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(name))
+        if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            query = query.Where(e => e.Name!.Contains(name));
+            query = query.Where(e => e.Name!.Contains(request.Name));
         }
 
-        if (!string.IsNullOrWhiteSpace(department))
+        if (!string.IsNullOrWhiteSpace(request.Department))
         {
-            query = query.Where(e => e.Department!.Contains(department));
+            query = query.Where(e => e.Department!.Contains(request.Department));
         }
 
         var employees = await query.Select(e => ToEmployeeResponse(e)).ToListAsync();
         var totalCount = await query.CountAsync();
-        var pageCount = (int)Math.Ceiling((double)totalCount / pageSize);
+        var pageCount = (int)Math.Ceiling((double)totalCount / request.PageSize);
 
-        if (page < 1 || page > pageCount)
+        if (request.Page < 1 || request.Page > pageCount)
         {
-            page = 1;
+            request.Page = 1;
         }
 
         var pagedEmployees = employees
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
             .ToList();
 
         return new PagedResponse<EmployeeResponse>
         {
             Items = pagedEmployees,
-            Page = page,
-            PageSize = pageSize,
+            Page = request.Page,
+            PageSize = request.PageSize,
             TotalCount = totalCount
         };
     }
