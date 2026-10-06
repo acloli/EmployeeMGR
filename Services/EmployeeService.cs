@@ -29,6 +29,43 @@ public class EmployeeService : IEmployeeService
         return await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
     }
 
+    public async Task<PagedResponse<EmployeeResponse>> GetEmployeesAsync(string? name, string? department,
+        int page, int pageSize)
+    {
+        var query = _context.Employees.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            query = query.Where(e => e.Name!.Contains(name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(department))
+        {
+            query = query.Where(e => e.Department!.Contains(department));
+        }
+
+        var employees = await query.Select(e => ToEmployeeResponse(e)).ToListAsync();
+        var totalCount = await query.CountAsync();
+        var pageCount = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        if (page < 1 || page > pageCount)
+        {
+            page = 1;
+        }
+
+        var pagedEmployees = employees
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResponse<EmployeeResponse>
+        {
+            Items = pagedEmployees,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
     public async Task<EmployeeResponse?> GetEmployeeByIdAsync(int id)
     {
         var employee = await _context.Employees.FindAsync(id);

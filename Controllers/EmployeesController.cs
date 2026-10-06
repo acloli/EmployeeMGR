@@ -15,11 +15,25 @@ namespace EmployeeMGR.Controllers
             _employeeService = employeeService;
         }
 
-        // GET: api/Employees
+        // GET: api/Employees?name=Tanaka
+        // GET: api/Employees?department=Sales
+        // GET: api/Employees?name=Sales&page=1&pageSize=20
         [HttpGet]
-        public async Task<IEnumerable<EmployeeResponse>> GetEmployees()
+        public async Task<PagedResponse<EmployeeResponse>> GetEmployees(
+            [FromQuery] string? name,
+            [FromQuery] string? department,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
-            return await _employeeService.GetAllEmployeesAsync();
+            return await _employeeService.GetEmployeesAsync(name, department, page, pageSize);
+        }
+
+        // GET: api/Employees/all
+        [HttpGet("all")]
+        public async Task<ActionResult<IEnumerable<EmployeeResponse>>> GetAllEmployees()
+        {
+            var employees = await _employeeService.GetAllEmployeesAsync();
+            return Ok(employees);
         }
 
         // GET: api/Employees/5
