@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using EmployeeMGR.Models;
 using EmployeeMGR.Services;
+using EmployeeMGR.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,7 +45,12 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi(options => { options.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_0; });
+builder.Services.AddOpenApi(options =>
+{
+    options.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_0;
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddOperationTransformer<AuthOperationTransformer>();
+});
 
 builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite(
     builder.Configuration.GetConnectionString("EmployeeList") ??
