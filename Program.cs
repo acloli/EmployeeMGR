@@ -52,6 +52,7 @@ builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite(
 ));
 
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 var app = builder.Build();
 
