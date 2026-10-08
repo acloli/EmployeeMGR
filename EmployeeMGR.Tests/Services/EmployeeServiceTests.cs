@@ -2,6 +2,7 @@ using EmployeeMGR.Models;
 using EmployeeMGR.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace EmployeeMGR.Tests.Services;
 
@@ -19,5 +20,30 @@ public class EmployeeServiceTests
         await context.Database.EnsureCreatedAsync();
 
         return (connection, context);
+    }
+
+    [Fact]
+    public async Task GetEmployeeByIdAsync_WhenEmployeeExists_ReturnsEmployee()
+    {
+        var (connection, context) = await CreateContextAsync();
+
+        await using var _ = connection;
+        await using var __ = context;
+
+        context.Employees.Add(new Employee
+        {
+            Name = "田中太郎",
+            Email = "tanaka@example.com",
+            Phone = "090-1234-5678",
+            Department = "システム部",
+        });
+
+        await context.SaveChangesAsync();
+        var service = new EmployeeService(context);
+        var result = await service.GetEmployeeByIdAsync(1);
+
+        Assert.NotNull(result);
+        Assert.Equal("田中太郎", result.Name);
+        Assert.Equal("システム部", result.Department);
     }
 }
