@@ -2,10 +2,10 @@
 
 > **Note**
 > 本プロジェクトは、**C# / .NET / ASP.NET Core Web API / Entity Framework Core の基礎習得を目的とした学習・研修用プロジェクト**です。
-> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化、および JWT による認証・認可の基本を理解・実践するためのサンプル実装となっています。
+> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化、JWT による認証・認可（ロール別アクセス制御含む）、および xUnit による自動テスト（単体・結合テスト）の基本を理解・実践するためのサンプル実装となっています。
 
 Entity Framework Core と SQLite を利用した、シンプルな社員管理 Web API です。
-社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、JWT（JSON Web Token）を用いた認証・認可機能を提供します。
+社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、JWT（JSON Web Token）を用いた認証・認可機能、および xUnit による自動テスト環境を提供します。
 
 ---
 
@@ -19,21 +19,28 @@ Entity Framework Core と SQLite を利用した、シンプルな社員管理 W
 - **JWT 認証・認可 (Authentication & Authorization)**:
   - `Microsoft.AspNetCore.Authentication.JwtBearer` によるトークン検証
   - `[Authorize]` / `[AllowAnonymous]` 属性によるエンドポイントのアクセス制御
+  - `[Authorize(Roles = "Admin")]` によるロールベースの認可制御（RBAC）
   - クレーム（Name, Role）を含めた JWT トークンの生成・発行
 - **OpenAPI / Swagger の認証対応**: Transformer を用いた Bearer 認証スキームの定義と Swagger UI 上でのテスト
+- **自動テスト (xUnit & WebApplicationFactory)**:
+  - **単体テスト (Unit Test)**: SQLite in-memory 接続（`DataSource=:memory:`）を用いた DbContext の分離とサービスクラスのテスト
+  - **結合テスト (Integration Test)**: `WebApplicationFactory<Program>` を用いたエンドツーエンドの API 疎通確認・ロール認可テスト
 
 ---
 
 ## 主な機能
 
 - **認証 (Authentication)**:
-  - ログイン (`POST /api/auth/login`): ユーザー認証および JWT トークンの発行
+  - ログイン (`POST /api/auth/login`): ユーザー認証および JWT トークンの発行（Admin / User ロール付与）
 - **社員管理 (CRUD - 要認証)**:
-  - **一覧取得 (Read: List)**: 登録されている全社員の一覧を取得
-  - **詳細取得 (Read: Detail)**: 指定した ID の社員詳細情報を取得
-  - **新規登録 (Create)**: 新しい社員情報を登録
-  - **情報更新 (Update)**: 既存の社員情報を更新
-  - **削除 (Delete)**: 指定した ID の社員情報を削除
+  - **一覧取得 (Read: List)**: 登録されている全社員の一覧を取得（全認証ユーザー）
+  - **詳細取得 (Read: Detail)**: 指定した ID の社員詳細情報を取得（全認証ユーザー）
+  - **新規登録 (Create)**: 新しい社員情報を登録（全認証ユーザー）
+  - **情報更新 (Update)**: 既存の社員情報を更新（全認証ユーザー）
+  - **削除 (Delete)**: 指定した ID の社員情報を削除（**Admin ロール限定**）
+- **自動テスト (Test Automation)**:
+  - サービスクラスの単体テスト（xUnit + SQLite in-memory）
+  - API エンドポイントの結合テスト（xUnit + WebApplicationFactory）
 
 ---
 
@@ -43,10 +50,12 @@ Entity Framework Core と SQLite を利用した、シンプルな社員管理 W
 | :--- | :--- | :--- |
 | プラットフォーム | .NET | 10.0 |
 | フレームワーク | ASP.NET Core Web API | Controllers 方式 |
-| 認証・認可 | JWT Bearer | `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0) |
+| 認証・認可 | JWT Bearer (ロール認可対応) | `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0) |
 | ORM | Entity Framework Core | 10.0 (Sqlite) |
 | データベース | SQLite | `EmployeeList.db` |
 | API ドキュメント | OpenAPI / Swagger UI | `NSwag.AspNetCore` / `Microsoft.AspNetCore.OpenApi` |
+| テストフレームワーク | xUnit | 2.9.3 |
+| 統合テストライブラリ | ASP.NET Core Testing | `Microsoft.AspNetCore.Mvc.Testing` (10.0) |
 
 ---
 
@@ -59,7 +68,7 @@ EmployeeMGR/
 │   └── LoginResponse.cs                 # ログインレスポンス DTO (JWT & 有効期限)
 ├── Controllers/
 │   ├── AuthController.cs                # 認証 API コントローラー (ログイン・トークン発行)
-│   └── EmployeesController.cs           # 社員管理 API コントローラー (CRUD 実装, [Authorize])
+│   └── EmployeesController.cs           # 社員管理 API コントローラー (CRUD 実装, [Authorize], 削除は Admin 限定)
 ├── Models/
 │   ├── Employee.cs                      # 社員エンティティ (DBモデル)
 │   ├── EmployeeContext.cs               # DbContext (EF Core)
@@ -80,8 +89,15 @@ EmployeeMGR/
 ├── appsettings.json                     # アプリケーション共通設定
 ├── appsettings.Development.json         # 開発環境用設定 (SQLite 接続文字列等)
 ├── EmployeeList.db                      # SQLite データベースファイル
-├── EmployeeMGR.csproj                   # プロジェクト定義・依存関係
-└── Program.cs                           # アプリケーションのエントリポイント
+├── EmployeeMGR.csproj                   # メインプロジェクト定義
+├── Program.cs                           # アプリケーションのエントリポイント
+└── EmployeeMGR.Tests/                   # テストプロジェクト (xUnit)
+    ├── EmployeeMGR.Tests.csproj         # テストプロジェクト定義
+    ├── CustomWebApplicationFactory.cs   # 結合テスト用 WebApplicationFactory (テスト用JWT・DB初期化設定)
+    ├── Services/
+    │   └── EmployeeServiceTests.cs      # EmployeeService の単体テスト (SQLite in-memory)
+    └── Integration/
+        └── EmployeesApiTests.cs         # Web API の結合テスト (認証・ロール認可検証)
 ```
 
 ---
@@ -147,6 +163,30 @@ dotnet run --launch-profile http
 
 ---
 
+## 自動テストの実行
+
+本プロジェクトには xUnit による単体テストおよび結合テストが含まれています。
+以下のコマンドで全テストを一括実行できます：
+
+```bash
+dotnet test
+```
+
+### 実装されているテスト一覧
+
+#### 1. 単体テスト (`EmployeeMGR.Tests/Services/EmployeeServiceTests.cs`)
+SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のファイル DB に影響を与えずに独立した環境でサービスクラスをテストします。
+- **`GetEmployeeByIdAsync_WhenEmployeeExists_ReturnsEmployee`**: 指定した ID の社員が存在する場合に、該当する社員エンティティが正しく取得できることを検証
+- **`GetEmployeeByIdAsync_WhenNotFound_ReturnsNull`**: 存在しない ID を指定した場合に `null` が返されることを検証
+
+#### 2. 結合テスト (`EmployeeMGR.Tests/Integration/EmployeesApiTests.cs`)
+`CustomWebApplicationFactory` を通じてテスト用サーバーを起動し、HTTP リクエストを送信して API 全体の動作を検証します。
+- **`GetEmployees_WithoutToken_ReturnsUnauthorized`**: Authorization ヘッダーを付与せずにアクセスした場合、`401 Unauthorized` が返ることを検証
+- **`GetEmployees_WithToken_ReturnsOk`**: 正常にログインして取得した Bearer トークンを付与した場合、`200 OK` が返ることを検証
+- **`DeleteEmployee_WithUserToken_Returns403`**: 一般ユーザー（`User` ロール）のトークンで社員削除 API を実行した場合、管理者権限が必要なため `403 Forbidden` が返ることを検証
+
+---
+
 ## API エンドポイント仕様
 
 ### 1. 認証 API (`/api/Auth`)
@@ -156,10 +196,10 @@ dotnet run --launch-profile http
 | `POST` | `/api/auth/login` | ログインして JWT トークンを取得 | 不要 (`AllowAnonymous`) | `200 OK` |
 
 #### テスト用アカウント
-| ユーザー名 (UserName) | パスワード (Password) | 付与されるロール |
-| :--- | :--- | :--- |
-| `admin` | `test123` | `Admin` |
-| `user` | `test123` | `User` |
+| ユーザー名 (UserName) | パスワード (Password) | 付与されるロール | 権限範囲 |
+| :--- | :--- | :--- | :--- |
+| `admin` | `test123` | `Admin` | 全操作（社員の閲覧・登録・更新・**削除**） |
+| `user` | `test123` | `User` | 社員の閲覧・登録・更新（**削除不可**） |
 
 #### ログインリクエスト / レスポンス例
 - **リクエスト (`POST /api/auth/login`)**:
@@ -188,13 +228,13 @@ dotnet run --launch-profile http
 Authorization: Bearer <取得したJWTトークン>
 ```
 
-| メソッド | エンドポイント | 説明 | 認証 | 成功時ステータス |
+| メソッド | エンドポイント | 説明 | 認可要件 | 成功時ステータス |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/Employees` | 社員一覧を取得 | **必須** | `200 OK` |
-| `GET` | `/api/Employees/{id}` | 指定 ID の社員詳細を取得 | **必須** | `200 OK` |
-| `POST` | `/api/Employees` | 社員を新規登録 | **必須** | `201 Created` |
-| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 | **必須** | `204 NoContent` |
-| `DELETE` | `/api/Employees/{id}` | 指定 ID の社員を削除 | **必須** | `204 NoContent` |
+| `GET` | `/api/Employees` | 社員一覧を取得 | 認証必須 (全ロール) | `200 OK` |
+| `GET` | `/api/Employees/{id}` | 指定 ID の社員詳細を取得 | 認証必須 (全ロール) | `200 OK` |
+| `POST` | `/api/Employees` | 社員を新規登録 | 認証必須 (全ロール) | `201 Created` |
+| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 | 認証必須 (全ロール) | `204 NoContent` |
+| `DELETE` | `/api/Employees/{id}` | 指定 ID の社員を削除 | **Admin ロール必須** | `204 NoContent` |
 
 ---
 
@@ -282,8 +322,9 @@ Authorization: Bearer <取得したJWTトークン>
   - 対象の社員が存在しない場合: `404 Not Found`
 
 #### 5. 社員削除 (`DELETE /api/Employees/{id}`)
-- **ヘッダー**: `Authorization: Bearer <token>`
+- **ヘッダー**: `Authorization: Bearer <Admin権限のトークン>`
 - **レスポンス**: `204 No Content`
 - **エラー時**:
   - 未認証: `401 Unauthorized`
+  - **権限不足（一般ユーザーなど `Admin` ロール以外の場合）: `403 Forbidden`**
   - 対象の社員が存在しない場合: `404 Not Found`
