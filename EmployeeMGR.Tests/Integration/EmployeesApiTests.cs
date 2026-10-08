@@ -32,4 +32,16 @@ public class EmployeesApiTests : IClassFixture<CustomWebApplicationFactory>
         var employeesResponse = await _client.GetAsync("/api/Employees?page=1&pageSize=20");
         Assert.Equal(HttpStatusCode.OK, employeesResponse.StatusCode);
     }
+    
+    [Fact]
+    public async Task DeleteEmployee_WithUserToken_Returns403()
+    {
+        var response = await _client.PostAsJsonAsync("/api/Auth/login", new {userName = "user", password = "test123"});
+        var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResponse!.Token);
+
+        var deleteResponse = await _client.DeleteAsync("/api/Employees/1");
+        Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
+    }
 }
