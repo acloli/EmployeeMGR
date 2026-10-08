@@ -46,4 +46,18 @@ public class EmployeeServiceTests
         Assert.Equal("田中太郎", result.Name);
         Assert.Equal("システム部", result.Department);
     }
+
+    [Fact]
+    public async Task GetEmployeeByIdAsync_WhenNotFound_ReturnsNull()
+    {
+        var (connection, context) = await CreateContextAsync();
+
+        await using var _ = connection;
+        await using var __ = context;
+
+        var service = new EmployeeService(context);
+        var result = await service.GetEmployeeByIdAsync(999);
+
+        Assert.Null(result);
+    }
 }
