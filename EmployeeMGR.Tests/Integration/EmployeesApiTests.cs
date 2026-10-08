@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using EmployeeMGR.Auth;
 
 namespace EmployeeMGR.Tests.Integration;
 
