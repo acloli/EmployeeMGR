@@ -90,6 +90,7 @@ namespace EmployeeMGR.Controllers
         }
 
         // DELETE: api/Employees/5
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEmployee(int id)
         {
