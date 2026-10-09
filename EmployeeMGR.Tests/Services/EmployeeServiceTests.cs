@@ -2,6 +2,7 @@ using EmployeeMGR.Models;
 using EmployeeMGR.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace EmployeeMGR.Tests.Services;
@@ -39,7 +40,7 @@ public class EmployeeServiceTests
         });
 
         await context.SaveChangesAsync();
-        var service = new EmployeeService(context);
+        var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
         var result = await service.GetEmployeeByIdAsync(1);
 
         Assert.NotNull(result);
@@ -55,7 +56,7 @@ public class EmployeeServiceTests
         await using var _ = connection;
         await using var __ = context;
 
-        var service = new EmployeeService(context);
+        var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
         var result = await service.GetEmployeeByIdAsync(999);
 
         Assert.Null(result);
