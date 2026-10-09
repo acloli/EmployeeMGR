@@ -51,6 +51,7 @@ namespace EmployeeMGR.Controllers
 
         // PUT: api/Employees/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> PutEmployee(int id, [FromBody] UpdateEmployeeRequest request)
         {
@@ -73,6 +74,7 @@ namespace EmployeeMGR.Controllers
 
         // POST: api/Employees
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request)
         {
