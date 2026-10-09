@@ -86,7 +86,7 @@ namespace EmployeeMGR.Controllers
         public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request)
         {
             var created = await _employeeService.CreateEmployeeAsync(request);
-            return created;
+            return CreatedAtAction(nameof(GetEmployee), new { id = created.Id }, created);
         }
 
         // DELETE: api/Employees/5
