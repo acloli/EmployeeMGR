@@ -2,10 +2,10 @@
 
 > **Note**
 > 本プロジェクトは、**C# / .NET / ASP.NET Core Web API / Entity Framework Core の基礎習得を目的とした学習・研修用プロジェクト**です。
-> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化、JWT による認証・認可（ロール別アクセス制御含む）、および xUnit による自動テスト（単体・結合テスト）の基本を理解・実践するためのサンプル実装となっています。
+> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化、JWT によるロールベース認証・認可、グローバル例外ハンドリング（ProblemDetails）、および xUnit による自動テスト（単体・結合テスト）の基本を理解・実践するためのサンプル実装となっています。
 
-Entity Framework Core と SQLite を利用した、シンプルな社員管理 Web API です。
-社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、JWT（JSON Web Token）を用いた認証・認可機能、および xUnit による自動テスト環境を提供します。
+Entity Framework Core と SQLite を利用した、社員管理 Web API です。
+社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、JWT によるロールベースアクセス制御、統一されたエラーハンドリング（RFC 7807 ProblemDetails）、構造化ログ、非同期キャンセル制御（CancellationToken）、および xUnit による自動テスト環境を提供します。
 
 ---
 
@@ -13,18 +13,25 @@ Entity Framework Core と SQLite を利用した、シンプルな社員管理 W
 
 - **ASP.NET Core Web API**: コントローラー（Controllers 方式）を用いた RESTful API の設計・実装
 - **Entity Framework Core**: DbContext、マイグレーション（Code First）、SQLite を用いたデータ永続化
-- **CRUD 実装**: 一覧・詳細・登録・更新・削除の各 HTTP メソッド（GET, POST, PUT, DELETE）とステータスコードの扱い
+- **CRUD 実装**: 一覧・詳細・登録・更新・削除の各 HTTP メソッド（GET, POST, PUT, DELETE）と適切なステータスコード（200, 201 Created + Locationヘッダー, 204, 400, 401, 403, 404, 500）の扱い
 - **DTO の活用**: エンティティ（DB モデル）と API 入出力モデル（Request / Response DTO）の分離
 - **サービス層と DI (依存性の注入)**: コントローラーからビジネスロジックやトークン生成処理をサービス層に分離し、DI コンテナで管理
-- **JWT 認証・認可 (Authentication & Authorization)**:
+- **JWT 認証・認可 (Role-Based Access Control: RBAC)**:
   - `Microsoft.AspNetCore.Authentication.JwtBearer` によるトークン検証
-  - `[Authorize]` / `[AllowAnonymous]` 属性によるエンドポイントのアクセス制御
-  - `[Authorize(Roles = "Admin")]` によるロールベースの認可制御（RBAC）
-  - クレーム（Name, Role）を含めた JWT トークンの生成・発行
+  - `[Authorize]` / `[AllowAnonymous]` / `[Authorize(Roles = "Admin")]` 属性によるロール別アクセス制御
+  - 参照系は一般ユーザー含む全認証ユーザー、登録・更新・削除は Admin ロール限定
+- **グローバル例外ハンドリング & ProblemDetails (RFC 7807)**:
+  - `IExceptionHandler` (`GlobalExceptionHandler`) による未処理例外の集約ハンドリング
+  - 内部実装や DB の機密情報・スタックトレースを隠蔽した安全な 500 エラーレスポンス（`traceId` 連携）
+  - バリデーションエラーやリソース不在時の統一的な `ProblemDetails` レスポンス
+- **非同期キャンセル制御 (`CancellationToken`)**:
+  - コントローラーからサービス層、EF Core までの `CancellationToken` 伝播による安全なリクエスト中断処理
+- **構造化ロギング (`ILogger`)**:
+  - 操作ログおよび例外発生時の TraceId 付きログ記録
 - **OpenAPI / Swagger の認証対応**: Transformer を用いた Bearer 認証スキームの定義と Swagger UI 上でのテスト
 - **自動テスト (xUnit & WebApplicationFactory)**:
   - **単体テスト (Unit Test)**: SQLite in-memory 接続（`DataSource=:memory:`）を用いた DbContext の分離とサービスクラスのテスト
-  - **結合テスト (Integration Test)**: `WebApplicationFactory<Program>` を用いたエンドツーエンドの API 疎通確認・ロール認可テスト
+  - **結合テスト (Integration Test)**: `WebApplicationFactory<Program>` を用いたエンドツーエンドの API 疎通、正常系（200, 201）、異常系（400, 401, 403, 404, 500）の自動検証
 
 ---
 
@@ -35,12 +42,16 @@ Entity Framework Core と SQLite を利用した、シンプルな社員管理 W
 - **社員管理 (CRUD - 要認証)**:
   - **一覧取得 (Read: List)**: 登録されている全社員の一覧を取得（全認証ユーザー）
   - **詳細取得 (Read: Detail)**: 指定した ID の社員詳細情報を取得（全認証ユーザー）
-  - **新規登録 (Create)**: 新しい社員情報を登録（全認証ユーザー）
-  - **情報更新 (Update)**: 既存の社員情報を更新（全認証ユーザー）
+  - **新規登録 (Create)**: 新しい社員情報を登録（**Admin ロール限定** / `201 Created` + Location ヘッダー）
+  - **情報更新 (Update)**: 既存の社員情報を更新（**Admin ロール限定**）
   - **削除 (Delete)**: 指定した ID の社員情報を削除（**Admin ロール限定**）
+- **共通基盤**:
+  - グローバル例外ハンドリング（RFC 7807 ProblemDetails）
+  - 構造化ロギング (`ILogger`)
+  - 非同期処理のキャンセル対応 (`CancellationToken`)
 - **自動テスト (Test Automation)**:
   - サービスクラスの単体テスト（xUnit + SQLite in-memory）
-  - API エンドポイントの結合テスト（xUnit + WebApplicationFactory）
+  - Web API の結合テスト（xUnit + WebApplicationFactory）
 
 ---
 
@@ -50,7 +61,9 @@ Entity Framework Core と SQLite を利用した、シンプルな社員管理 W
 | :--- | :--- | :--- |
 | プラットフォーム | .NET | 10.0 |
 | フレームワーク | ASP.NET Core Web API | Controllers 方式 |
-| 認証・認可 | JWT Bearer (ロール認可対応) | `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0) |
+| 認証・認可 | JWT Bearer (RBAC) | `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0) |
+| エラーハンドリング | ProblemDetails / ExceptionHandler | RFC 7807 準拠 (`IExceptionHandler`) |
+| ロギング | ASP.NET Core Logging | `ILogger` (構造化ログ) |
 | ORM | Entity Framework Core | 10.0 (Sqlite) |
 | データベース | SQLite | `EmployeeList.db` |
 | API ドキュメント | OpenAPI / Swagger UI | `NSwag.AspNetCore` / `Microsoft.AspNetCore.OpenApi` |
@@ -68,16 +81,20 @@ EmployeeMGR/
 │   └── LoginResponse.cs                 # ログインレスポンス DTO (JWT & 有効期限)
 ├── Controllers/
 │   ├── AuthController.cs                # 認証 API コントローラー (ログイン・トークン発行)
-│   └── EmployeesController.cs           # 社員管理 API コントローラー (CRUD 実装, [Authorize], 削除は Admin 限定)
+│   └── EmployeesController.cs           # 社員管理 API コントローラー (CRUD 実装, RBAC 制御, ProblemDetails)
+├── ExceptionHandlers/
+│   └── GlobalExceptionHandler.cs        # 未処理例外ハンドラー (IExceptionHandler 実装, 安全な500返却)
 ├── Models/
 │   ├── Employee.cs                      # 社員エンティティ (DBモデル)
 │   ├── EmployeeContext.cs               # DbContext (EF Core)
 │   ├── CreateEmployeeRequest.cs         # 登録用リクエスト DTO
 │   ├── UpdateEmployeeRequest.cs         # 更新用リクエスト DTO
-│   └── EmployeeResponse.cs              # レスポンス用 DTO
+│   ├── EmployeeResponse.cs              # レスポンス用 DTO
+│   ├── EmployeeSearchRequest.cs        # 検索・ページネーション用リクエスト DTO
+│   └── PagedResponse.cs                 # ページネーションレスポンス DTO
 ├── Services/
-│   ├── IEmployeeService.cs              # 社員管理サービス インターフェース
-│   ├── EmployeeService.cs               # 社員管理サービス 実装
+│   ├── IEmployeeService.cs              # 社員管理サービス インターフェース (CancellationToken 対応)
+│   ├── EmployeeService.cs               # 社員管理サービス 実装 (ログ出力, ページング順序保証)
 │   ├── ITokenService.cs                 # JWT トークン生成サービス インターフェース
 │   └── TokenService.cs                  # JWT トークン生成サービス 実装
 ├── OpenApi/
@@ -97,7 +114,7 @@ EmployeeMGR/
     ├── Services/
     │   └── EmployeeServiceTests.cs      # EmployeeService の単体テスト (SQLite in-memory)
     └── Integration/
-        └── EmployeesApiTests.cs         # Web API の結合テスト (認証・ロール認可検証)
+        └── EmployeesApiTests.cs         # Web API の結合テスト (200, 201, 400, 401, 403, 404, 500検証)
 ```
 
 ---
@@ -123,7 +140,7 @@ dotnet user-secrets set "Jwt:Issuer" "EmployeeMGR"
 dotnet user-secrets set "Jwt:Audience" "EmployeeMGRUser"
 ```
 
-※ または `appsettings.Development.json` に直接記述することも可能です（シークレットキーのコミットにはご注意ください）：
+※ または `appsettings.Development.json` に直接記述することも可能です：
 ```json
 {
   "Jwt": {
@@ -180,10 +197,16 @@ SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のフ�
 - **`GetEmployeeByIdAsync_WhenNotFound_ReturnsNull`**: 存在しない ID を指定した場合に `null` が返されることを検証
 
 #### 2. 結合テスト (`EmployeeMGR.Tests/Integration/EmployeesApiTests.cs`)
-`CustomWebApplicationFactory` を通じてテスト用サーバーを起動し、HTTP リクエストを送信して API 全体の動作を検証します。
-- **`GetEmployees_WithoutToken_ReturnsUnauthorized`**: Authorization ヘッダーを付与せずにアクセスした場合、`401 Unauthorized` が返ることを検証
-- **`GetEmployees_WithToken_ReturnsOk`**: 正常にログインして取得した Bearer トークンを付与した場合、`200 OK` が返ることを検証
-- **`DeleteEmployee_WithUserToken_Returns403`**: 一般ユーザー（`User` ロール）のトークンで社員削除 API を実行した場合、管理者権限が必要なため `403 Forbidden` が返ることを検証
+`CustomWebApplicationFactory` を通じてテスト用インプロセスサーバーを起動し、HTTP リクエストを送信して API 全体の動作・ステータスコードを網羅的に検証します。
+- **未認証 (`401 Unauthorized`)**: Authorization ヘッダーなしのリクエストが拒否されることを検証
+- **正常取得 (`200 OK`)**: Bearer トークン付きリクエストで社員一覧が取得できることを検証
+- **新規作成 (`201 Created`)**: 管理者トークンで社員作成後、`201 Created` と `Location` ヘッダーが返り、Location 先から作成データを取得できることを検証
+- **ロール認可拒否 (`403 Forbidden`)**: 一般ユーザー（`User` ロール）で更新・削除を実行した際に拒否されることを検証
+- **リクエスト不正 (`400 Bad Request`)**:
+  - 入力バリデーション違反時に `ValidationProblemDetails` が返ることを検証
+  - 更新リクエストで URL の ID とボディの ID が不一致の場合に `ProblemDetails` が返ることを検証
+- **リソース不在 (`404 Not Found`)**: 存在しない ID に対する GET / PUT / DELETE 時に `ProblemDetails` が返ることを検証
+- **内部エラー安全保護 (`500 Internal Server Error`)**: 予期せぬ例外発生時、スタックトレースや DB 内部情報を隠蔽し、`traceId` を含んだ安全な `ProblemDetails` が返ることを検証
 
 ---
 
@@ -198,8 +221,8 @@ SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のフ�
 #### テスト用アカウント
 | ユーザー名 (UserName) | パスワード (Password) | 付与されるロール | 権限範囲 |
 | :--- | :--- | :--- | :--- |
-| `admin` | `test123` | `Admin` | 全操作（社員の閲覧・登録・更新・**削除**） |
-| `user` | `test123` | `User` | 社員の閲覧・登録・更新（**削除不可**） |
+| `admin` | `test123` | `Admin` | 全操作（社員の閲覧・**登録・更新・削除**） |
+| `user` | `test123` | `User` | 社員の閲覧のみ（**登録・更新・削除は不可**） |
 
 #### ログインリクエスト / レスポンス例
 - **リクエスト (`POST /api/auth/login`)**:
@@ -213,7 +236,7 @@ SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のフ�
   ```json
   {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "expiresAt": "2026-10-07T10:00:00Z"
+    "expiresAt": "2026-10-09T10:00:00Z"
   }
   ```
 - **エラー時**: 認証失敗時は `401 Unauthorized`
@@ -230,36 +253,35 @@ Authorization: Bearer <取得したJWTトークン>
 
 | メソッド | エンドポイント | 説明 | 認可要件 | 成功時ステータス |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/Employees` | 社員一覧を取得 | 認証必須 (全ロール) | `200 OK` |
+| `GET` | `/api/Employees` | 社員一覧を取得 (ページネーション対応) | 認証必須 (全ロール) | `200 OK` |
+| `GET` | `/api/Employees/all` | 全社員一覧を取得 | 認証必須 (全ロール) | `200 OK` |
 | `GET` | `/api/Employees/{id}` | 指定 ID の社員詳細を取得 | 認証必須 (全ロール) | `200 OK` |
-| `POST` | `/api/Employees` | 社員を新規登録 | 認証必須 (全ロール) | `201 Created` |
-| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 | 認証必須 (全ロール) | `204 NoContent` |
+| `POST` | `/api/Employees` | 社員を新規登録 | **Admin ロール必須** | `201 Created` |
+| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 | **Admin ロール必須** | `204 NoContent` |
 | `DELETE` | `/api/Employees/{id}` | 指定 ID の社員を削除 | **Admin ロール必須** | `204 NoContent` |
 
 ---
 
 ### エンドポイント詳細とリクエスト / レスポンス例
 
-#### 1. 社員一覧取得 (`GET /api/Employees`)
+#### 1. 社員一覧取得 (`GET /api/Employees?page=1&pageSize=20`)
 - **ヘッダー**: `Authorization: Bearer <token>`
 - **レスポンス (200 OK)**:
   ```json
-  [
-    {
-      "id": 1,
-      "name": "山田 太郎",
-      "email": "yamada@example.com",
-      "phone": "090-1234-5678",
-      "department": "Engineering"
-    },
-    {
-      "id": 2,
-      "name": "佐藤 花子",
-      "email": "sato@example.com",
-      "phone": "080-9876-5432",
-      "department": "Marketing"
-    }
-  ]
+  {
+    "items": [
+      {
+        "id": 1,
+        "name": "山田 太郎",
+        "email": "yamada@example.com",
+        "phone": "090-1234-5678",
+        "department": "Engineering"
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "totalCount": 1
+  }
   ```
 - **エラー時**: 未認証または無効なトークンの場合 `401 Unauthorized`
 
@@ -275,12 +297,18 @@ Authorization: Bearer <取得したJWTトークン>
     "department": "Engineering"
   }
   ```
-- **エラー時**:
-  - 未認証: `401 Unauthorized`
-  - 対象が存在しない場合: `404 Not Found`
+- **エラー時 (404 Not Found - ProblemDetails)**:
+  ```json
+  {
+    "type": "about:blank",
+    "title": "Employee not found",
+    "status": 404,
+    "detail": "Employee with ID 999 was not found"
+  }
+  ```
 
 #### 3. 社員新規登録 (`POST /api/Employees`)
-- **ヘッダー**: `Authorization: Bearer <token>`
+- **ヘッダー**: `Authorization: Bearer <Admin権限のトークン>`
 - **リクエストボディ**:
   ```json
   {
@@ -291,7 +319,7 @@ Authorization: Bearer <取得したJWTトークン>
   }
   ```
 - **レスポンス (201 Created)**:
-  - `Location` ヘッダーに作成されたリソースの URL（例: `/api/Employees/3`）が返されます。
+  - `Location`: `/api/Employees/3`
   - レスポンスボディ:
     ```json
     {
@@ -302,9 +330,22 @@ Authorization: Bearer <取得したJWTトークン>
       "department": "Sales"
     }
     ```
+- **エラー時**:
+  - 一般ユーザーで実行: `403 Forbidden`
+  - バリデーションエラー (`400 Bad Request`):
+    ```json
+    {
+      "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+      "title": "One or more validation errors occurred.",
+      "status": 400,
+      "errors": {
+        "Name": ["The Name field is required."]
+      }
+    }
+    ```
 
 #### 4. 社員情報更新 (`PUT /api/Employees/{id}`)
-- **ヘッダー**: `Authorization: Bearer <token>`
+- **ヘッダー**: `Authorization: Bearer <Admin権限のトークン>`
 - **リクエストボディ**:
   ```json
   {
@@ -317,14 +358,54 @@ Authorization: Bearer <取得したJWTトークン>
   ```
 - **レスポンス**: `204 No Content`
 - **エラー時**:
-  - 未認証: `401 Unauthorized`
-  - URL の `{id}` とボディの `id` が不一致の場合: `400 Bad Request`
-  - 対象の社員が存在しない場合: `404 Not Found`
+  - 一般ユーザーで実行: `403 Forbidden`
+  - URL の ID とボディの ID 不一致 (`400 Bad Request`):
+    ```json
+    {
+      "type": "about:blank",
+      "title": "Invalid request",
+      "status": 400,
+      "detail": "ID mismatch. Request ID: 2, URL ID: 1"
+    }
+    ```
+  - 対象が存在しない場合 (`404 Not Found`):
+    ```json
+    {
+      "type": "about:blank",
+      "title": "Employee not found",
+      "status": 404,
+      "detail": "Employee with ID 1 was not found"
+    }
+    ```
 
 #### 5. 社員削除 (`DELETE /api/Employees/{id}`)
 - **ヘッダー**: `Authorization: Bearer <Admin権限のトークン>`
 - **レスポンス**: `204 No Content`
 - **エラー時**:
-  - 未認証: `401 Unauthorized`
-  - **権限不足（一般ユーザーなど `Admin` ロール以外の場合）: `403 Forbidden`**
-  - 対象の社員が存在しない場合: `404 Not Found`
+  - 一般ユーザーで実行: `403 Forbidden`
+  - 対象が存在しない場合 (`404 Not Found`):
+    ```json
+    {
+      "type": "about:blank",
+      "title": "Employee not found",
+      "status": 404,
+      "detail": "Employee with ID 999 was not found"
+    }
+    ```
+
+---
+
+### 3. 共通エラーレスポンス仕様 (ProblemDetails: RFC 7807)
+
+未処理の内部例外が発生した場合、`GlobalExceptionHandler` により内部スタックトレースや機密情報を隠蔽した以下の安全な JSON レスポンスが返されます：
+
+```json
+{
+  "type": "about:blank",
+  "title": "Internal Server Error",
+  "status": 500,
+  "detail": "An unexpected error occurred.",
+  "traceId": "0HN1234567890:00000001"
+}
+```
+※ `traceId` はサーバーログと照合して調査を行うための識別子です。

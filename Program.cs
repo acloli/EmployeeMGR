@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using EmployeeMGR.ExceptionHandlers;
 using Microsoft.EntityFrameworkCore;
 using EmployeeMGR.Models;
 using EmployeeMGR.Services;
@@ -60,7 +61,12 @@ builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite(
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

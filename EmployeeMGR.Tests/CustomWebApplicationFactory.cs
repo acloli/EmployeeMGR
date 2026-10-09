@@ -8,6 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 using EmployeeMGR.Models;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace EmployeeMGR.Tests;
@@ -41,6 +45,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<EmployeeContext>();
+            services.RemoveAll<DbContextOptions<EmployeeContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<EmployeeContext>>();
+            services.AddSingleton(_ =>
+            {
+                var connection = new SqliteConnection("Data Source=:memory:");
+                connection.Open();
+                return connection;
+            });
+            services.AddDbContext<EmployeeContext>((provider, options) =>
+                options.UseSqlite(provider.GetRequiredService<SqliteConnection>()));
+
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters

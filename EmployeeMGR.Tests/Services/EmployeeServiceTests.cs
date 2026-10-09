@@ -2,6 +2,7 @@ using EmployeeMGR.Models;
 using EmployeeMGR.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace EmployeeMGR.Tests.Services;
@@ -39,8 +40,8 @@ public class EmployeeServiceTests
         });
 
         await context.SaveChangesAsync();
-        var service = new EmployeeService(context);
-        var result = await service.GetEmployeeByIdAsync(1);
+        var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
+        var result = await service.GetEmployeeByIdAsync(1, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("田中太郎", result.Name);
@@ -55,8 +56,8 @@ public class EmployeeServiceTests
         await using var _ = connection;
         await using var __ = context;
 
-        var service = new EmployeeService(context);
-        var result = await service.GetEmployeeByIdAsync(999);
+        var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
+        var result = await service.GetEmployeeByIdAsync(999, CancellationToken.None);
 
         Assert.Null(result);
     }
