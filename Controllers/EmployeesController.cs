@@ -43,7 +43,11 @@ namespace EmployeeMGR.Controllers
 
             if (employee == null)
             {
-                return NotFound();
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Employee not found",
+                    detail: $"Employee with ID {id} was not found"
+                );
             }
 
             return employee;
@@ -58,19 +62,25 @@ namespace EmployeeMGR.Controllers
         {
             if (id != request.Id)
             {
-                return BadRequest();
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: $"ID mismatch. Request ID: {request.Id}, URL ID: {id}"
+                );
             }
 
             var updated = await _employeeService.UpdateEmployeeAsync(id, request, token);
 
             if (!updated)
             {
-                return NotFound();
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Employee not found",
+                    detail: $"Employee with ID {id} was not found"
+                );
             }
-            else
-            {
-                return NoContent();
-            }
+
+            return NoContent();
         }
 
         // POST: api/Employees
@@ -92,12 +102,14 @@ namespace EmployeeMGR.Controllers
             var deleted = await _employeeService.DeleteEmployeeAsync(id, token);
             if (!deleted)
             {
-                return NotFound();
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Employee not found",
+                    detail: $"Employee with ID {id} was not found"
+                );
             }
-            else
-            {
-                return NoContent();
-            }
+
+            return NoContent();
         }
     }
 }
