@@ -26,10 +26,10 @@ public class EmployeeService : IEmployeeService
         };
     }
 
-    public async Task<IEnumerable<EmployeeResponse>> GetAllEmployeesAsync()
+    public async Task<IEnumerable<EmployeeResponse>> GetAllEmployeesAsync(CancellationToken token)
     {
         _logger.LogDebug("Getting all employees");
-        var employees = await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync();
+        var employees = await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync(token);
         _logger.LogDebug("Retrieved {EmployeeCount} employees", employees.Count);
         return employees;
     }
@@ -77,10 +77,10 @@ public class EmployeeService : IEmployeeService
         };
     }
 
-    public async Task<EmployeeResponse?> GetEmployeeByIdAsync(int id)
+    public async Task<EmployeeResponse?> GetEmployeeByIdAsync(int id, CancellationToken token)
     {
         _logger.LogDebug("Getting employee {EmployeeId}", id);
-        var employee = await _context.Employees.FindAsync(id);
+        var employee = await _context.Employees.FindAsync([id], token);
         if (employee == null)
         {
             _logger.LogWarning("Employee {EmployeeId} was not found", id);
@@ -91,7 +91,7 @@ public class EmployeeService : IEmployeeService
         return ToEmployeeResponse(employee);
     }
 
-    public async Task<EmployeeResponse> CreateEmployeeAsync(CreateEmployeeRequest request)
+    public async Task<EmployeeResponse> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken token)
     {
         _logger.LogDebug("Creating employee");
         Employee employee = new Employee
@@ -102,12 +102,12 @@ public class EmployeeService : IEmployeeService
             Department = request.Department
         };
         _context.Employees.Add(employee);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(token);
         _logger.LogInformation("Employee {EmployeeId} created", employee.Id);
         return ToEmployeeResponse(employee);
     }
 
-    public async Task<bool> UpdateEmployeeAsync(int id, UpdateEmployeeRequest request)
+    public async Task<bool> UpdateEmployeeAsync(int id, UpdateEmployeeRequest request, CancellationToken token)
     {
         _logger.LogDebug("Updating employee {EmployeeId}", id);
         if (id != request.Id)
@@ -129,7 +129,7 @@ public class EmployeeService : IEmployeeService
         _context.Entry(employee).State = EntityState.Modified;
         try
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(token);
             _logger.LogInformation("Employee {EmployeeId} updated", id);
         }
         catch (DbUpdateConcurrencyException)
@@ -146,10 +146,10 @@ public class EmployeeService : IEmployeeService
         return true;
     }
 
-    public async Task<bool> DeleteEmployeeAsync(int id)
+    public async Task<bool> DeleteEmployeeAsync(int id, CancellationToken token)
     {
         _logger.LogDebug("Deleting employee {EmployeeId}", id);
-        var employee = await _context.Employees.FindAsync(id);
+        var employee = await _context.Employees.FindAsync([id], token);
         if (employee == null)
         {
             _logger.LogWarning("Employee {EmployeeId} was not found for deletion", id);
@@ -157,7 +157,7 @@ public class EmployeeService : IEmployeeService
         }
 
         _context.Employees.Remove(employee);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(token);
         _logger.LogInformation("Employee {EmployeeId} deleted", id);
         return true;
     }

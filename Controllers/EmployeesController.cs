@@ -29,17 +29,17 @@ namespace EmployeeMGR.Controllers
 
         // GET: api/Employees/all
         [HttpGet("all")]
-        public async Task<ActionResult<IEnumerable<EmployeeResponse>>> GetAllEmployees()
+        public async Task<ActionResult<IEnumerable<EmployeeResponse>>> GetAllEmployees(CancellationToken token)
         {
-            var employees = await _employeeService.GetAllEmployeesAsync();
+            var employees = await _employeeService.GetAllEmployeesAsync(token);
             return Ok(employees);
         }
 
         // GET: api/Employees/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<EmployeeResponse>> GetEmployee(int id)
+        public async Task<ActionResult<EmployeeResponse>> GetEmployee(int id, CancellationToken token)
         {
-            var employee = await _employeeService.GetEmployeeByIdAsync(id);
+            var employee = await _employeeService.GetEmployeeByIdAsync(id, token);
 
             if (employee == null)
             {
@@ -53,14 +53,15 @@ namespace EmployeeMGR.Controllers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutEmployee(int id, [FromBody] UpdateEmployeeRequest request)
+        public async Task<IActionResult> PutEmployee(int id, [FromBody] UpdateEmployeeRequest request,
+            CancellationToken token)
         {
             if (id != request.Id)
             {
                 return BadRequest();
             }
 
-            var updated = await _employeeService.UpdateEmployeeAsync(id, request);
+            var updated = await _employeeService.UpdateEmployeeAsync(id, request, token);
 
             if (!updated)
             {
@@ -76,18 +77,19 @@ namespace EmployeeMGR.Controllers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request)
+        public async Task<ActionResult<EmployeeResponse>> PostEmployee([FromBody] CreateEmployeeRequest request,
+            CancellationToken token)
         {
-            var created = await _employeeService.CreateEmployeeAsync(request);
+            var created = await _employeeService.CreateEmployeeAsync(request, token);
             return CreatedAtAction(nameof(GetEmployee), new { id = created.Id }, created);
         }
 
         // DELETE: api/Employees/5
         [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteEmployee(int id)
+        public async Task<IActionResult> DeleteEmployee(int id, CancellationToken token)
         {
-            var deleted = await _employeeService.DeleteEmployeeAsync(id);
+            var deleted = await _employeeService.DeleteEmployeeAsync(id, token);
             if (!deleted)
             {
                 return NotFound();
