@@ -41,7 +41,7 @@ public class EmployeeServiceTests
 
         await context.SaveChangesAsync();
         var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
-        var result = await service.GetEmployeeByIdAsync(1);
+        var result = await service.GetEmployeeByIdAsync(1, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("田中太郎", result.Name);
@@ -57,7 +57,7 @@ public class EmployeeServiceTests
         await using var __ = context;
 
         var service = new EmployeeService(context, NullLogger<EmployeeService>.Instance);
-        var result = await service.GetEmployeeByIdAsync(999);
+        var result = await service.GetEmployeeByIdAsync(999, CancellationToken.None);
 
         Assert.Null(result);
     }
