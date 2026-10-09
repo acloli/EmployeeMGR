@@ -60,7 +60,11 @@ builder.Services.AddDbContext<EmployeeContext>(opt => opt.UseSqlite(
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
