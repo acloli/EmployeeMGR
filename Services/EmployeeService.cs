@@ -51,7 +51,6 @@ public class EmployeeService : IEmployeeService
             query = query.Where(e => e.Department!.Contains(request.Department));
         }
 
-        var employees = await query.Select(e => ToEmployeeResponse(e)).ToListAsync(token);
         var totalCount = await query.CountAsync(token);
         var pageCount = (int)Math.Ceiling((double)totalCount / request.PageSize);
 
@@ -60,16 +59,18 @@ public class EmployeeService : IEmployeeService
             request.Page = 1;
         }
 
-        var pagedEmployees = employees
+        var employees = await query.OrderBy(employee => employee.Id)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .ToList();
+            .Select(employee => ToEmployeeResponse(employee))
+            .ToListAsync(token);
+
         _logger.LogDebug(
             "Retrieved {EmployeeCount} employees. Page: {Page}, PageSize: {PageSize}, TotalCount: {TotalCount}",
-            pagedEmployees.Count, request.Page, request.PageSize, totalCount);
+            employees.Count, request.Page, request.PageSize, totalCount);
         return new PagedResponse<EmployeeResponse>
         {
-            Items = pagedEmployees,
+            Items = employees,
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
