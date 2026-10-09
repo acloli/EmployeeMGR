@@ -59,15 +59,6 @@ namespace EmployeeMGR.Controllers
                 return BadRequest();
             }
 
-            Employee employee = new()
-            {
-                Id = request.Id,
-                Name = request.Name,
-                Email = request.Email,
-                Phone = request.Phone,
-                Department = request.Department
-            };
-
             var updated = await _employeeService.UpdateEmployeeAsync(id, request);
 
             if (!updated)
