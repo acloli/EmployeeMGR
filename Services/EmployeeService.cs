@@ -24,7 +24,7 @@ public class EmployeeService : IEmployeeService
             Phone = employee.Phone,
             Department = employee.DepartmentInfo != null ? employee.DepartmentInfo.Name : employee.Department,
             DepartmentInfo = employee.DepartmentInfo != null
-                ? new Department { Id = employee.DepartmentInfo.Id, Name = employee.DepartmentInfo.Name }
+                ? new DepartmentResponse { Id = employee.DepartmentInfo.Id, Name = employee.DepartmentInfo.Name }
                 : null
         };
 
