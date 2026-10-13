@@ -1,5 +1,6 @@
 using EmployeeMGR.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace EmployeeMGR.Services;
 
@@ -14,22 +15,28 @@ public class EmployeeService : IEmployeeService
         _logger = logger;
     }
 
-    private static EmployeeResponse ToEmployeeResponse(Employee employee)
-    {
-        return new EmployeeResponse
+    private static readonly Expression<Func<Employee, EmployeeResponse>> EmployeeResponseProjection = employee =>
+        new EmployeeResponse
         {
             Id = employee.Id,
             Name = employee.Name,
             Email = employee.Email,
             Phone = employee.Phone,
-            Department = employee.Department
+            Department = employee.DepartmentInfo != null ? employee.DepartmentInfo.Name : employee.Department,
+            DepartmentInfo = employee.DepartmentInfo != null
+                ? new Department { Id = employee.DepartmentInfo.Id, Name = employee.DepartmentInfo.Name }
+                : null
         };
-    }
+
+    private static readonly Func<Employee, EmployeeResponse> ToEmployeeResponse = EmployeeResponseProjection.Compile();
 
     public async Task<IEnumerable<EmployeeResponse>> GetAllEmployeesAsync(CancellationToken token)
     {
         _logger.LogDebug("Getting all employees");
-        var employees = await _context.Employees.Select(e => ToEmployeeResponse(e)).ToListAsync(token);
+        var employees = await _context.Employees.AsNoTracking()
+            .OrderBy(e => e.Id)
+            .Select(EmployeeResponseProjection)
+            .ToListAsync(token);
         _logger.LogDebug("Retrieved {EmployeeCount} employees", employees.Count);
         return employees;
     }
@@ -40,7 +47,7 @@ public class EmployeeService : IEmployeeService
         _logger.LogDebug(
             "Getting employees. Page: {Page}, PageSize: {PageSize}",
             request.Page, request.PageSize);
-        var query = _context.Employees.AsQueryable();
+        var query = _context.Employees.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
             query = query.Where(e => e.Name!.Contains(request.Name));
@@ -48,7 +55,9 @@ public class EmployeeService : IEmployeeService
 
         if (!string.IsNullOrWhiteSpace(request.Department))
         {
-            query = query.Where(e => e.Department!.Contains(request.Department));
+            query = query.Where(e => (e.DepartmentInfo != null
+                ? e.DepartmentInfo.Name
+                : e.Department)!.Contains(request.Department));
         }
 
         var totalCount = await query.CountAsync(token);
@@ -62,7 +71,7 @@ public class EmployeeService : IEmployeeService
         var employees = await query.OrderBy(employee => employee.Id)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(employee => ToEmployeeResponse(employee))
+            .Select(EmployeeResponseProjection)
             .ToListAsync(token);
 
         _logger.LogDebug(
@@ -80,7 +89,10 @@ public class EmployeeService : IEmployeeService
     public async Task<EmployeeResponse?> GetEmployeeByIdAsync(int id, CancellationToken token)
     {
         _logger.LogDebug("Getting employee {EmployeeId}", id);
-        var employee = await _context.Employees.FindAsync([id], token);
+        var employee = await _context.Employees.AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(EmployeeResponseProjection)
+            .SingleOrDefaultAsync(token);
         if (employee == null)
         {
             _logger.LogWarning("Employee {EmployeeId} was not found", id);
@@ -88,18 +100,22 @@ public class EmployeeService : IEmployeeService
         }
 
         _logger.LogDebug("Retrieved employee {EmployeeId}", id);
-        return ToEmployeeResponse(employee);
+        return employee;
     }
 
     public async Task<EmployeeResponse> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken token)
     {
         _logger.LogDebug("Creating employee");
+
+        Department department = await GetOrCreateDepartmentAsync(request.Department!, token);
+
         Employee employee = new Employee
         {
             Name = request.Name,
             Email = request.Email,
             Phone = request.Phone,
-            Department = request.Department
+            Department = department.Name,
+            DepartmentInfo = department
         };
         _context.Employees.Add(employee);
         await _context.SaveChangesAsync(token);
@@ -118,15 +134,19 @@ public class EmployeeService : IEmployeeService
             return false;
         }
 
-        Employee employee = new()
+        var employee = await _context.Employees.FindAsync([id], token);
+        if (employee == null)
         {
-            Id = request.Id,
-            Name = request.Name,
-            Email = request.Email,
-            Phone = request.Phone,
-            Department = request.Department
-        };
-        _context.Entry(employee).State = EntityState.Modified;
+            _logger.LogWarning("Employee {EmployeeId} was not found for update", id);
+            return false;
+        }
+
+        var department = await GetOrCreateDepartmentAsync(request.Department!, token);
+        employee.Name = request.Name;
+        employee.Email = request.Email;
+        employee.Phone = request.Phone;
+        employee.Department = department.Name;
+        employee.DepartmentInfo = department;
         try
         {
             await _context.SaveChangesAsync(token);
@@ -134,7 +154,7 @@ public class EmployeeService : IEmployeeService
         }
         catch (DbUpdateConcurrencyException)
         {
-            if (!EmployeeExists(id))
+            if (!await _context.Employees.AnyAsync(e => e.Id == id, token))
             {
                 _logger.LogWarning("Employee {EmployeeId} was not found for update", id);
                 return false;
@@ -162,9 +182,23 @@ public class EmployeeService : IEmployeeService
         return true;
     }
 
-    private bool EmployeeExists(int id)
+    private async Task<Department> GetOrCreateDepartmentAsync(string departmentName, CancellationToken token)
     {
-        return _context.Employees.Any(e => e.Id == id);
+        var name = departmentName.Trim();
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("部署名が空です。");
+        }
+
+        var department = await _context.Departments.SingleOrDefaultAsync(dep => dep.Name == name, token);
+        if (department != null)
+        {
+            return department;
+        }
+
+        department = new Department { Name = name };
+        _context.Departments.Add(department);
+        return department;
     }
 }
-
