@@ -24,10 +24,7 @@ namespace EmployeeMGR.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false)
                 },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Departments", x => x.Id);
-                });
+                constraints: table => { table.PrimaryKey("PK_Departments", x => x.Id); });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Employees_DepartmentId",
@@ -47,6 +44,25 @@ namespace EmployeeMGR.Migrations
                 principalTable: "Departments",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.Sql("""
+                                 INSERT OR IGNORE INTO "Departments" ("Name")
+                                 SELECT DISTINCT TRIM("Department")
+                                 FROM "Employees"
+                                 WHERE "Department" IS NOT NULL
+                                   AND TRIM("Department") <> '';
+                                 """);
+
+            migrationBuilder.Sql("""
+                                 UPDATE "Employees"
+                                 SET "DepartmentId" = (
+                                    SELECT "Id"
+                                    FROM "Departments"
+                                    WHERE "Name" = TRIM("Employees"."Department")
+                                 )
+                                 WHERE "Department" IS NOT NULL
+                                   AND TRIM("Department") <> '';
+                                 """);
         }
 
         /// <inheritdoc />
