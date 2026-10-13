@@ -2,20 +2,25 @@
 
 > **Note**
 > 本プロジェクトは、**C# / .NET / ASP.NET Core Web API / Entity Framework Core の基礎習得を目的とした学習・研修用プロジェクト**です。
-> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化、JWT によるロールベース認証・認可、グローバル例外ハンドリング（ProblemDetails）、および xUnit による自動テスト（単体・結合テスト）の基本を理解・実践するためのサンプル実装となっています。
+> 本番運用向けではなく、Web API による CRUD 処理、ORM を用いた DB 永続化（リレーションシップ・データマイグレーション含む）、JWT によるロールベース認証・認可、グローバル例外ハンドリング（ProblemDetails）、および xUnit による自動テスト（単体・結合テスト）の基本を理解・実践するためのサンプル実装となっています。
 
 Entity Framework Core と SQLite を利用した、社員管理 Web API です。
-社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、JWT によるロールベースアクセス制御、統一されたエラーハンドリング（RFC 7807 ProblemDetails）、構造化ログ、非同期キャンセル制御（CancellationToken）、および xUnit による自動テスト環境を提供します。
+社員情報の登録・一覧取得・詳細取得・更新・削除（CRUD）機能に加え、部署マスタ（Department）との 1 対多リレーションシップ、JWT によるロールベースアクセス制御、統一されたエラーハンドリング（RFC 7807 ProblemDetails）、構造化ログ、非同期キャンセル制御（CancellationToken）、および xUnit による自動テスト環境を提供します。
 
 ---
 
 ## 学習テーマ・学べること
 
 - **ASP.NET Core Web API**: コントローラー（Controllers 方式）を用いた RESTful API の設計・実装
-- **Entity Framework Core**: DbContext、マイグレーション（Code First）、SQLite を用いたデータ永続化
+- **Entity Framework Core**:
+  - DbContext、マイグレーション（Code First）、SQLite を用いたデータ永続化
+  - **エンティティ間のリレーションシップ (1対多 / One-to-Many)**: `Department` (部署マスタ) と `Employee` (社員) の外部キー結合・ナビゲーションプロパティ
+  - **マイグレーションによるデータ移行 (Data Migration)**: 既存の文字列データからマスタテーブルへの自動データ抽出・登録・外部キー更新（`migrationBuilder.Sql`）
+  - **クエリ最適化とプロジェクション**: `AsNoTracking()` の適用、および式ツリー (`Expression<Func<Employee, EmployeeResponse>>`) を用いた DB クエリレベルでの DTO 射影
 - **CRUD 実装**: 一覧・詳細・登録・更新・削除の各 HTTP メソッド（GET, POST, PUT, DELETE）と適切なステータスコード（200, 201 Created + Locationヘッダー, 204, 400, 401, 403, 404, 500）の扱い
-- **DTO の活用**: エンティティ（DB モデル）と API 入出力モデル（Request / Response DTO）の分離
+- **DTO の活用**: エンティティ（DB モデル）と API 入出力モデル（Request / Response DTO）の分離（部署マスタ詳細を含むレスポンス DTO）
 - **サービス層と DI (依存性の注入)**: コントローラーからビジネスロジックやトークン生成処理をサービス層に分離し、DI コンテナで管理
+- **マスタの自動解決・再利用**: 社員登録・更新時に部署名（Trim後）から既存マスタを検索し、存在しない場合は自動作成して外部キーを紐付け
 - **JWT 認証・認可 (Role-Based Access Control: RBAC)**:
   - `Microsoft.AspNetCore.Authentication.JwtBearer` によるトークン検証
   - `[Authorize]` / `[AllowAnonymous]` / `[Authorize(Roles = "Admin")]` 属性によるロール別アクセス制御
@@ -30,7 +35,7 @@ Entity Framework Core と SQLite を利用した、社員管理 Web API です�
   - 操作ログおよび例外発生時の TraceId 付きログ記録
 - **OpenAPI / Swagger の認証対応**: Transformer を用いた Bearer 認証スキームの定義と Swagger UI 上でのテスト
 - **自動テスト (xUnit & WebApplicationFactory)**:
-  - **単体テスト (Unit Test)**: SQLite in-memory 接続（`DataSource=:memory:`）を用いた DbContext の分離とサービスクラスのテスト
+  - **単体テスト (Unit Test)**: SQLite in-memory 接続（`DataSource=:memory:`）を用いた DbContext の分離と、部署マスタ連携（再利用・更新・フォールバック）を含むサービスクラスのテスト
   - **結合テスト (Integration Test)**: `WebApplicationFactory<Program>` を用いたエンドツーエンドの API 疎通、正常系（200, 201）、異常系（400, 401, 403, 404, 500）の自動検証
 
 ---
@@ -40,11 +45,15 @@ Entity Framework Core と SQLite を利用した、社員管理 Web API です�
 - **認証 (Authentication)**:
   - ログイン (`POST /api/auth/login`): ユーザー認証および JWT トークンの発行（Admin / User ロール付与）
 - **社員管理 (CRUD - 要認証)**:
-  - **一覧取得 (Read: List)**: 登録されている全社員の一覧を取得（全認証ユーザー）
-  - **詳細取得 (Read: Detail)**: 指定した ID の社員詳細情報を取得（全認証ユーザー）
-  - **新規登録 (Create)**: 新しい社員情報を登録（**Admin ロール限定** / `201 Created` + Location ヘッダー）
-  - **情報更新 (Update)**: 既存の社員情報を更新（**Admin ロール限定**）
+  - **一覧取得 (Read: List)**: 登録されている全社員の一覧を取得（全認証ユーザー、部署マスタ情報を含む）
+  - **詳細取得 (Read: Detail)**: 指定した ID の社員詳細情報を取得（全認証ユーザー、部署マスタ情報を含む）
+  - **新規登録 (Create)**: 新しい社員情報を登録（**Admin ロール限定** / `201 Created` + Location ヘッダー、部署マスタの自動解決・作成）
+  - **情報更新 (Update)**: 既存の社員情報を更新（**Admin ロール限定**、部署マスタの自動更新）
   - **削除 (Delete)**: 指定した ID の社員情報を削除（**Admin ロール限定**）
+- **部署マスタ (Department Master)**:
+  - 部署テーブル（`Departments`）による正規化管理
+  - 社員の `DepartmentId` 外部キーによるリレーションシップ（削除制限: `Restrict`）
+  - レガシーデータ（未紐付け）との下位互換性（既存文字列へのフォールバック表示）
 - **共通基盤**:
   - グローバル例外ハンドリング（RFC 7807 ProblemDetails）
   - 構造化ロギング (`ILogger`)
@@ -64,8 +73,8 @@ Entity Framework Core と SQLite を利用した、社員管理 Web API です�
 | 認証・認可 | JWT Bearer (RBAC) | `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0) |
 | エラーハンドリング | ProblemDetails / ExceptionHandler | RFC 7807 準拠 (`IExceptionHandler`) |
 | ロギング | ASP.NET Core Logging | `ILogger` (構造化ログ) |
-| ORM | Entity Framework Core | 10.0 (Sqlite) |
-| データベース | SQLite | `EmployeeList.db` |
+| ORM | Entity Framework Core | 10.0 (Sqlite) / リレーションシップ・データ移行 |
+| データベース | SQLite | `EmployeeList.db` (`Employees`, `Departments`) |
 | API ドキュメント | OpenAPI / Swagger UI | `NSwag.AspNetCore` / `Microsoft.AspNetCore.OpenApi` |
 | テストフレームワーク | xUnit | 2.9.3 |
 | 統合テストライブラリ | ASP.NET Core Testing | `Microsoft.AspNetCore.Mvc.Testing` (10.0) |
@@ -85,22 +94,24 @@ EmployeeMGR/
 ├── ExceptionHandlers/
 │   └── GlobalExceptionHandler.cs        # 未処理例外ハンドラー (IExceptionHandler 実装, 安全な500返却)
 ├── Models/
-│   ├── Employee.cs                      # 社員エンティティ (DBモデル)
-│   ├── EmployeeContext.cs               # DbContext (EF Core)
+│   ├── Department.cs                    # 部署エンティティ (マスタモデル)
+│   ├── DepartmentResponse.cs            # 部署レスポンス用 DTO
+│   ├── Employee.cs                      # 社員エンティティ (DBモデル, DepartmentId 外部キー)
+│   ├── EmployeeContext.cs               # DbContext (EF Core, リレーション・インデックス定義)
 │   ├── CreateEmployeeRequest.cs         # 登録用リクエスト DTO
 │   ├── UpdateEmployeeRequest.cs         # 更新用リクエスト DTO
-│   ├── EmployeeResponse.cs              # レスポンス用 DTO
+│   ├── EmployeeResponse.cs              # レスポンス用 DTO (DepartmentInfo 包含)
 │   ├── EmployeeSearchRequest.cs        # 検索・ページネーション用リクエスト DTO
 │   └── PagedResponse.cs                 # ページネーションレスポンス DTO
 ├── Services/
 │   ├── IEmployeeService.cs              # 社員管理サービス インターフェース (CancellationToken 対応)
-│   ├── EmployeeService.cs               # 社員管理サービス 実装 (ログ出力, ページング順序保証)
+│   ├── EmployeeService.cs               # 社員管理サービス 実装 (部署マスタ自動解決, プロジェクション)
 │   ├── ITokenService.cs                 # JWT トークン生成サービス インターフェース
 │   └── TokenService.cs                  # JWT トークン生成サービス 実装
 ├── OpenApi/
 │   ├── AuthOperationTransformer.cs      # Swagger/OpenAPI 用 認証要件 Transformer
 │   └── BearerSecuritySchemeTransformer.cs # Swagger/OpenAPI 用 Bearer スキーム定義
-├── Migrations/                          # EF Core マイグレーションファイル
+├── Migrations/                          # EF Core マイグレーションファイル (AddDepartments 等)
 ├── Properties/
 │   └── launchSettings.json              # 起動プロファイル設定 (ポート等)
 ├── appsettings.json                     # アプリケーション共通設定
@@ -112,7 +123,7 @@ EmployeeMGR/
     ├── EmployeeMGR.Tests.csproj         # テストプロジェクト定義
     ├── CustomWebApplicationFactory.cs   # 結合テスト用 WebApplicationFactory (テスト用JWT・DB初期化設定)
     ├── Services/
-    │   └── EmployeeServiceTests.cs      # EmployeeService の単体テスト (SQLite in-memory)
+    │   └── EmployeeServiceTests.cs      # EmployeeService の単体テスト (部署マスタ再利用・更新等)
     └── Integration/
         └── EmployeesApiTests.cs         # Web API の結合テスト (200, 201, 400, 401, 403, 404, 500検証)
 ```
@@ -151,12 +162,12 @@ dotnet user-secrets set "Jwt:Audience" "EmployeeMGRUser"
 }
 ```
 
-### 3. データベースマイグレーションの適用 (初回のみ)
-データベースファイルが存在しない、または最新のスキーマを反映したい場合に実行します：
+### 3. データベースマイグレーションの適用
+データベースに最新のスキーマ（部署マスタテーブル作成およびデータ移行）を反映します：
 ```bash
 dotnet ef database update
 ```
-※ 既に `EmployeeList.db` が存在する場合はスキップ可能です。
+※ 既存の `EmployeeList.db` に保存されている社員の部署文字列データは、マイグレーション時に自動的に `Departments` テーブルへ移行され、外部キーが設定されます。
 
 ### 4. アプリケーションの起動
 ```bash
@@ -192,8 +203,11 @@ dotnet test
 ### 実装されているテスト一覧
 
 #### 1. 単体テスト (`EmployeeMGR.Tests/Services/EmployeeServiceTests.cs`)
-SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のファイル DB に影響を与えずに独立した環境でサービスクラスをテストします。
-- **`GetEmployeeByIdAsync_WhenEmployeeExists_ReturnsEmployee`**: 指定した ID の社員が存在する場合に、該当する社員エンティティが正しく取得できることを検証
+SQLite in-memory モード (`DataSource=:memory:`) を使用し、独立した環境でサービスクラスおよび部署マスタ連携ロジックをテストします。
+- **`CreateEmployees_WithSameTrimmedDepartment_ReusesDepartment`**: トリム後の部署名が同一の場合に、同一の部署マスタが再利用されて紐付くことを検証
+- **`UpdateEmployee_WhenDepartmentChanges_UpdatesRelationshipAndLegacyName`**: 部署変更時に、新しい部署マスタへの外部キー関連付けおよびレガシー部署名が正しく更新されることを検証
+- **`ReadEmployees_UsesMasterDepartmentAndFallsBackForLegacyEmployees`**: 部署マスタが紐づく場合はマスタの名称を優先し、未設定のレガシー社員の場合は既存文字列へフォールバックされること、および `AsNoTracking` により変更追跡に残らないことを検証
+- **`GetEmployeeByIdAsync_WhenEmployeeExists_ReturnsEmployee`**: 指定した ID の社員が存在する場合に正しく取得できることを検証
 - **`GetEmployeeByIdAsync_WhenNotFound_ReturnsNull`**: 存在しない ID を指定した場合に `null` が返されることを検証
 
 #### 2. 結合テスト (`EmployeeMGR.Tests/Integration/EmployeesApiTests.cs`)
@@ -236,7 +250,7 @@ SQLite in-memory モード (`DataSource=:memory:`) を使用し、実際のフ�
   ```json
   {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "expiresAt": "2026-10-09T10:00:00Z"
+    "expiresAt": "2026-10-13T10:00:00Z"
   }
   ```
 - **エラー時**: 認証失敗時は `401 Unauthorized`
@@ -256,8 +270,8 @@ Authorization: Bearer <取得したJWTトークン>
 | `GET` | `/api/Employees` | 社員一覧を取得 (ページネーション対応) | 認証必須 (全ロール) | `200 OK` |
 | `GET` | `/api/Employees/all` | 全社員一覧を取得 | 認証必須 (全ロール) | `200 OK` |
 | `GET` | `/api/Employees/{id}` | 指定 ID の社員詳細を取得 | 認証必須 (全ロール) | `200 OK` |
-| `POST` | `/api/Employees` | 社員を新規登録 | **Admin ロール必須** | `201 Created` |
-| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 | **Admin ロール必須** | `204 NoContent` |
+| `POST` | `/api/Employees` | 社員を新規登録 (部署マスタ自動解決) | **Admin ロール必須** | `201 Created` |
+| `PUT` | `/api/Employees/{id}` | 指定 ID の社員情報を更新 (部署マスタ自動更新) | **Admin ロール必須** | `204 NoContent` |
 | `DELETE` | `/api/Employees/{id}` | 指定 ID の社員を削除 | **Admin ロール必須** | `204 NoContent` |
 
 ---
@@ -275,7 +289,11 @@ Authorization: Bearer <取得したJWTトークン>
         "name": "山田 太郎",
         "email": "yamada@example.com",
         "phone": "090-1234-5678",
-        "department": "Engineering"
+        "department": "Engineering",
+        "departmentInfo": {
+          "id": 1,
+          "name": "Engineering"
+        }
       }
     ],
     "page": 1,
@@ -294,7 +312,11 @@ Authorization: Bearer <取得したJWTトークン>
     "name": "山田 太郎",
     "email": "yamada@example.com",
     "phone": "090-1234-5678",
-    "department": "Engineering"
+    "department": "Engineering",
+    "departmentInfo": {
+      "id": 1,
+      "name": "Engineering"
+    }
   }
   ```
 - **エラー時 (404 Not Found - ProblemDetails)**:
@@ -327,7 +349,11 @@ Authorization: Bearer <取得したJWTトークン>
       "name": "鈴木 一郎",
       "email": "suzuki@example.com",
       "phone": "070-1111-2222",
-      "department": "Sales"
+      "department": "Sales",
+      "departmentInfo": {
+        "id": 2,
+        "name": "Sales"
+      }
     }
     ```
 - **エラー時**:
