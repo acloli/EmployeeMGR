@@ -16,6 +16,25 @@ namespace EmployeeMGR.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("EmployeeMGR.Models.Department", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Departments");
+                });
+
             modelBuilder.Entity("EmployeeMGR.Models.Employee", b =>
                 {
                     b.Property<int>("Id")
@@ -24,6 +43,9 @@ namespace EmployeeMGR.Migrations
 
                     b.Property<string>("Department")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
                         .HasColumnType("TEXT");
@@ -36,7 +58,24 @@ namespace EmployeeMGR.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartmentId");
+
                     b.ToTable("Employees");
+                });
+
+            modelBuilder.Entity("EmployeeMGR.Models.Employee", b =>
+                {
+                    b.HasOne("EmployeeMGR.Models.Department", "DepartmentInfo")
+                        .WithMany("Employees")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DepartmentInfo");
+                });
+
+            modelBuilder.Entity("EmployeeMGR.Models.Department", b =>
+                {
+                    b.Navigation("Employees");
                 });
 #pragma warning restore 612, 618
         }
